@@ -187,16 +187,16 @@ parse_args :: proc(cfg: ^LauncherConfig) -> (show_help: bool) {
 }
 
 print_help :: proc() {
-    fmt.println("DBSL", DBSL_VERSION)
-    fmt.println()
-    fmt.println("Usage: dbsl [-d <path>] [-u <path>] [-w <path>] [-v] [-h]")
-    fmt.println()
-    fmt.println("Options:")
-    fmt.println("  -h          Show this help")
-    fmt.println("  -v          Verbose output")
-    fmt.println("  -d <path>   Dolphin executable path")
-    fmt.println("  -u <path>   Dolphin user directory path")
-    fmt.println("  -w <path>   Wallpaper image path")
+    help := "DBSL " + DBSL_VERSION +
+        "\n\nUsage: dbsl [-v] [-d <path>] [-u <path>] [-w <path>]" +
+        "\n\nOptions:" +
+        "\n  -h          Show this help" +
+        "\n  -v          Verbose output" +
+        "\n  -d <path>   Dolphin executable path" +
+        "\n  -u <path>   Dolphin user directory" +
+        "\n  -w <path>   Wallpaper image path\n"
+
+    console_print(help)
 }
 
 load_wallpaper :: proc(app: ^App) {
