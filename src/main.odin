@@ -165,22 +165,20 @@ parse_args :: proc(cfg: ^LauncherConfig) -> (show_help: bool) {
     i := 1
     for i < len(args) {
         arg := args[i]
-        if arg == "-d" && i + 1 < len(args) {
+        if arg == "-v" {
+            verbose = true
+            i += 1
+        } else if arg == "-d" && i + 1 < len(args) {
             cfg.dolphin_executable = args[i + 1]
             i += 2
-        } else if arg == "-h" {
-            return true
         } else if arg == "-u" && i + 1 < len(args) {
             cfg.dolphin_user_dir = args[i + 1]
             i += 2
-        } else if arg == "-v" {
-            verbose = true
-            i += 1
         } else if arg == "-w" && i + 1 < len(args) {
             cfg.wallpaper = args[i + 1]
             i += 2
         } else {
-            i += 1
+            return true
         }
     }
     return false
