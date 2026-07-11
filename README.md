@@ -1,7 +1,7 @@
 
 # Dolphin Big Screen Launcher (DBSL)
 
-A cross-platform, controller or keyboard launcher for [Dolphin Emulator](https://dolphin-emu.org/) games. It reads your existing Dolphin game library, downloads cover art from GameTDB, and launches games in Dolphin's batch mode.
+DBSL is a cross-platform, controller or keyboard launcher for [Dolphin Emulator](https://dolphin-emu.org/) games. DBSL uses ISO paths from Dolphin, downloads cover art from GameTDB, and launches games in Dolphin's batch mode.
 
 ![Screenshot of Dolphin Big Screen Launcher](resources/screenshots/screenshot1.webp?raw=true)
 
