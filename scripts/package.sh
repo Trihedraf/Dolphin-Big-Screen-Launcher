@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 APP_ID="dbsl"
 APP_NAME="Dolphin Big Screen Launcher"
-VERSION="1.0"
+VERSION=$(tr -d '[:space:]' < VERSION)
 OUTPUT="dist"
 
 mkdir -p "$OUTPUT"

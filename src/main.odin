@@ -12,6 +12,8 @@ SCREEN_WIDTH :: 1280
 SCREEN_HEIGHT :: 720
 TARGET_FPS :: 60
 
+DBSL_VERSION :: #config(DBSL_VERSION, "dev")
+
 verbose: bool
 
 AppState :: enum {
@@ -46,7 +48,10 @@ App :: struct {
 main :: proc() {
     app: App
     app.cfg, _ = load_config()
-    parse_args(&app.cfg)
+    if parse_args(&app.cfg) {
+        print_help()
+        return
+    }
 
     if verbose {
         fmt.println("Dolphin executable:", app.cfg.dolphin_executable)
@@ -155,7 +160,7 @@ set_error :: proc(app: ^App, message: string) {
     app.error_message = strings.clone(message)
 }
 
-parse_args :: proc(cfg: ^LauncherConfig) {
+parse_args :: proc(cfg: ^LauncherConfig) -> (show_help: bool) {
     args := os.args
     i := 1
     for i < len(args) {
@@ -163,6 +168,8 @@ parse_args :: proc(cfg: ^LauncherConfig) {
         if arg == "-d" && i + 1 < len(args) {
             cfg.dolphin_executable = args[i + 1]
             i += 2
+        } else if arg == "-h" {
+            return true
         } else if arg == "-u" && i + 1 < len(args) {
             cfg.dolphin_user_dir = args[i + 1]
             i += 2
@@ -176,6 +183,20 @@ parse_args :: proc(cfg: ^LauncherConfig) {
             i += 1
         }
     }
+    return false
+}
+
+print_help :: proc() {
+    fmt.println("DBSL", DBSL_VERSION)
+    fmt.println()
+    fmt.println("Usage: dbsl [-d <path>] [-u <path>] [-w <path>] [-v] [-h]")
+    fmt.println()
+    fmt.println("Options:")
+    fmt.println("  -h          Show this help")
+    fmt.println("  -v          Verbose output")
+    fmt.println("  -d <path>   Dolphin executable path")
+    fmt.println("  -u <path>   Dolphin user directory path")
+    fmt.println("  -w <path>   Wallpaper image path")
 }
 
 load_wallpaper :: proc(app: ^App) {

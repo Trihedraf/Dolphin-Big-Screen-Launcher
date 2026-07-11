@@ -48,5 +48,7 @@ else
     ODIN="$ODIN_BIN"
 fi
 
-$ODIN build src -out:bin/dbsl "$@"
+VERSION=$(tr -d '[:space:]' < VERSION)
+
+$ODIN build src -out:bin/dbsl -define:DBSL_VERSION="$VERSION" "$@"
 echo "Build complete: bin/dbsl"

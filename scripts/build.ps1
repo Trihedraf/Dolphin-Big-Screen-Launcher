@@ -91,7 +91,8 @@ Ensure-Odin
 Ensure-RaylibWindows
 
 Write-Host "Building..."
-& $odinExe build src -out:bin\dbsl.exe -subsystem:windows @args
+$Version = (Get-Content VERSION).Trim()
+& $odinExe build src -out:bin\dbsl.exe -subsystem:windows -define:DBSL_VERSION=$Version @args
 if ($LASTEXITCODE -ne 0) {
     throw "Build failed"
 }

@@ -42,10 +42,11 @@ All arguments override `dbsl.json` values:
 
 | Flag | Description |
 | --- | --- |
-| `-d <path>` | Override Dolphin executable path |
-| `-u <path>` | Override Dolphin user directory |
-| `-v` | Print diagnostic info (paths, gamepad, game count) |
-| `-w <path>` | Override wallpaper image |
+| `-h` | Show help and version |
+| `-v` | Verbose output |
+| `-d <path>` | Dolphin executable path |
+| `-u <path>` | Dolphin user directory path |
+| `-w <path>` | Wallpaper image path |
 
 By default, only errors are printed.
 
