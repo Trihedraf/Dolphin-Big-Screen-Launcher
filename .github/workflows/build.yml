@@ -1,86 +1,109 @@
 name: Build
 
 on:
-  push:
-    branches: [master]
-    tags: ["v*"]
-  pull_request:
-    branches: [master]
-  workflow_dispatch:
+    push:
+        branches: [master]
+        tags: ["*"]
+    pull_request:
+        branches: [master]
+    release:
+        types: [published]
+    workflow_dispatch:
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
+    build-windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v7
 
-      - name: Cache Odin
-        uses: actions/cache@v6
-        with:
-          path: tools/odin
-          key: odin-windows-dev-2026-07a
+            - name: Cache Odin
+              uses: actions/cache@v6
+              with:
+                path: tools/odin
+                key: odin-windows-dev-2026-07a
 
-      - name: Download Odin and build
-        shell: pwsh
-        run: scripts/build.ps1
+            - name: Download Odin and build
+              shell: pwsh
+              run: scripts/build.ps1
 
-      - name: Package
-        shell: pwsh
-        run: scripts/package.ps1
+            - name: Package
+              shell: pwsh
+              run: scripts/package.ps1
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          path: dist/dbsl-windows-x64.zip
-          archive: false
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                path: dist/dbsl-windows-x64.zip
+                archive: false
 
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
+            - name: Update Release
+              if: ${{ github.event_name == 'release' && !env.ACT }}
+              uses: svenstaro/upload-release-action@v2
+              with:
+                file: dist/dbsl-windows-x64.zip
+                overwrite: true
 
-      - name: Cache Odin
-        uses: actions/cache@v6
-        with:
-          path: tools/odin
-          key: odin-linux-dev-2026-07a
+    build-linux:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang libx11-dev libcurl4-openssl-dev
+            - name: Cache Odin
+              uses: actions/cache@v6
+              with:
+                path: tools/odin
+                key: odin-linux-dev-2026-07a
 
-      - name: Download Odin and build
-        run: scripts/build.sh
+            - name: Install dependencies
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y clang libx11-dev libcurl4-openssl-dev
 
-      - name: Package
-        run: scripts/package.sh
+            - name: Download Odin and build
+              run: scripts/build.sh
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          path: dist/dbsl-linux-x64.tar.xz
-          archive: false
+            - name: Package
+              run: scripts/package.sh
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                path: dist/dbsl-linux-x64.tar.xz
+                archive: false
 
-      - name: Cache Odin
-        uses: actions/cache@v6
-        with:
-          path: tools/odin
-          key: odin-macos-dev-2026-07a
+            - name: Update Release
+              if: ${{ github.event_name == 'release' && !env.ACT }}
+              uses: svenstaro/upload-release-action@v2
+              with:
+                file: dist/dbsl-linux-x64.tar.xz
+                overwrite: true
 
-      - name: Download Odin and build
-        run: scripts/build.sh
+    build-macos:
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v7
 
-      - name: Package
-        run: scripts/package.sh
+            - name: Cache Odin
+              uses: actions/cache@v6
+              with:
+                path: tools/odin
+                key: odin-macos-dev-2026-07a
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          path: dist/dbsl-macos-arm.zip
-          archive: false
+            - name: Download Odin and build
+              run: scripts/build.sh
+
+            - name: Package
+              run: scripts/package.sh
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                path: dist/dbsl-macos-arm.zip
+                archive: false
+
+            - name: Update Release
+              if: ${{ github.event_name == 'release' && !env.ACT }}
+              uses: svenstaro/upload-release-action@v2
+              with:
+                file: dist/dbsl-macos-arm.zip
+                overwrite: true
