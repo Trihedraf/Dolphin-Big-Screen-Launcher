@@ -1,0 +1,13 @@
+/tools/
+/bin/
+/dist/
+*.exe
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.zip
+*.tar.gz
+*.tar.xz
+.DS_Store

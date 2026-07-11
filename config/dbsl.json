@@ -1,0 +1,6 @@
+{
+	"dolphin_executable": "/usr/bin/dolphin-emu",
+	"dolphin_user_dir": "~/emu/Dolphin/User",
+	"fullscreen": true,
+    "wallpaper": "~/emu/Dolphin/User/bg.jpg"
+}
