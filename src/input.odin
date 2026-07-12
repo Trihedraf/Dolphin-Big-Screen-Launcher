@@ -22,6 +22,7 @@ INPUT_INITIAL_INTERVAL :: f32(0.28)
 INPUT_MIN_INTERVAL :: f32(0.04)
 INPUT_ACCEL_TIME :: f32(1.2)
 INPUT_STICK_THRESHOLD :: f32(0.5)
+MAX_RAYLIB_GAMEPADS :: 4
 
 update_input :: proc(state: ^InputState) {
     dt := raylib.GetFrameTime()
@@ -56,51 +57,87 @@ update_input :: proc(state: ^InputState) {
     }
 }
 
-is_direction_pressed :: proc(dir: Direction) -> bool {
-    gamepad: i32 = 0
-    has_gamepad := raylib.IsGamepadAvailable(gamepad)
+raylib_gamepad_axis_x :: proc(gamepad: i32) -> f32 {
+    return raylib.GetGamepadAxisMovement(gamepad, .LEFT_X)
+}
 
+raylib_gamepad_axis_y :: proc(gamepad: i32) -> f32 {
+    return raylib.GetGamepadAxisMovement(gamepad, .LEFT_Y)
+}
+
+DPAD_AXIS_THRESHOLD :: f32(0.5)
+
+is_direction_pressed :: proc(dir: Direction) -> bool {
+    // Raylib gamepads
+    for i := i32(0); i < MAX_RAYLIB_GAMEPADS; i += 1 {
+        if !raylib.IsGamepadAvailable(i) {
+            continue
+        }
+        switch dir {
+        case .Up:
+            if raylib.IsGamepadButtonDown(i, .LEFT_FACE_UP) ||
+                    raylib_gamepad_axis_y(i) < -INPUT_STICK_THRESHOLD {
+                return true
+            }
+        case .Down:
+            if raylib.IsGamepadButtonDown(i, .LEFT_FACE_DOWN) ||
+                    raylib_gamepad_axis_y(i) > INPUT_STICK_THRESHOLD {
+                return true
+            }
+        case .Left:
+            if raylib.IsGamepadButtonDown(i, .LEFT_FACE_LEFT) ||
+                    raylib_gamepad_axis_x(i) < -INPUT_STICK_THRESHOLD {
+                return true
+            }
+        case .Right:
+            if raylib.IsGamepadButtonDown(i, .LEFT_FACE_RIGHT) ||
+                    raylib_gamepad_axis_x(i) > INPUT_STICK_THRESHOLD {
+                return true
+            }
+        }
+    }
+
+    // Linux joydev gamepads
+    when ODIN_OS == .Linux {
+        for i := 0; i < MAX_LINUX_GAMEPADS; i += 1 {
+            if !linux_gamepad_available(i) {
+                continue
+            }
+            switch dir {
+            case .Up:
+                if linux_gamepad_axis(i, JS_AXIS_LEFT_Y) < -INPUT_STICK_THRESHOLD ||
+                        linux_gamepad_axis(i, JS_AXIS_DPAD_Y) < -DPAD_AXIS_THRESHOLD {
+                    return true
+                }
+            case .Down:
+                if linux_gamepad_axis(i, JS_AXIS_LEFT_Y) > INPUT_STICK_THRESHOLD ||
+                        linux_gamepad_axis(i, JS_AXIS_DPAD_Y) > DPAD_AXIS_THRESHOLD {
+                    return true
+                }
+            case .Left:
+                if linux_gamepad_axis(i, JS_AXIS_LEFT_X) < -INPUT_STICK_THRESHOLD ||
+                        linux_gamepad_axis(i, JS_AXIS_DPAD_X) < -DPAD_AXIS_THRESHOLD {
+                    return true
+                }
+            case .Right:
+                if linux_gamepad_axis(i, JS_AXIS_LEFT_X) > INPUT_STICK_THRESHOLD ||
+                        linux_gamepad_axis(i, JS_AXIS_DPAD_X) > DPAD_AXIS_THRESHOLD {
+                    return true
+                }
+            }
+        }
+    }
+
+    // Keyboard
     switch dir {
     case .Up:
-        return(
-            (has_gamepad && raylib.IsGamepadButtonDown(gamepad, .LEFT_FACE_UP)) ||
-            (has_gamepad &&
-                    raylib.GetGamepadAxisMovement(gamepad, .LEFT_Y) < -INPUT_STICK_THRESHOLD) ||
-            (linux_gamepad_available() &&
-                    linux_gamepad_axis(JS_AXIS_LEFT_Y) < -INPUT_STICK_THRESHOLD) ||
-            raylib.IsKeyDown(.UP) ||
-            raylib.IsKeyDown(.W) \
-        )
+        return raylib.IsKeyDown(.UP) || raylib.IsKeyDown(.W)
     case .Down:
-        return(
-            (has_gamepad && raylib.IsGamepadButtonDown(gamepad, .LEFT_FACE_DOWN)) ||
-            (has_gamepad &&
-                    raylib.GetGamepadAxisMovement(gamepad, .LEFT_Y) > INPUT_STICK_THRESHOLD) ||
-            (linux_gamepad_available() &&
-                    linux_gamepad_axis(JS_AXIS_LEFT_Y) > INPUT_STICK_THRESHOLD) ||
-            raylib.IsKeyDown(.DOWN) ||
-            raylib.IsKeyDown(.S) \
-        )
+        return raylib.IsKeyDown(.DOWN) || raylib.IsKeyDown(.S)
     case .Left:
-        return(
-            (has_gamepad && raylib.IsGamepadButtonDown(gamepad, .LEFT_FACE_LEFT)) ||
-            (has_gamepad &&
-                    raylib.GetGamepadAxisMovement(gamepad, .LEFT_X) < -INPUT_STICK_THRESHOLD) ||
-            (linux_gamepad_available() &&
-                    linux_gamepad_axis(JS_AXIS_LEFT_X) < -INPUT_STICK_THRESHOLD) ||
-            raylib.IsKeyDown(.LEFT) ||
-            raylib.IsKeyDown(.A) \
-        )
+        return raylib.IsKeyDown(.LEFT) || raylib.IsKeyDown(.A)
     case .Right:
-        return(
-            (has_gamepad && raylib.IsGamepadButtonDown(gamepad, .LEFT_FACE_RIGHT)) ||
-            (has_gamepad &&
-                    raylib.GetGamepadAxisMovement(gamepad, .LEFT_X) > INPUT_STICK_THRESHOLD) ||
-            (linux_gamepad_available() &&
-                    linux_gamepad_axis(JS_AXIS_LEFT_X) > INPUT_STICK_THRESHOLD) ||
-            raylib.IsKeyDown(.RIGHT) ||
-            raylib.IsKeyDown(.D) \
-        )
+        return raylib.IsKeyDown(.RIGHT) || raylib.IsKeyDown(.D)
     }
     return false
 }
@@ -147,12 +184,24 @@ raylib_to_joydev_button :: proc(button: raylib.GamepadButton) -> int {
 }
 
 is_action_pressed :: proc(button: raylib.GamepadButton, key: raylib.KeyboardKey) -> bool {
-    gamepad: i32 = 0
-    has_gamepad := raylib.IsGamepadAvailable(gamepad)
     joy_btn := raylib_to_joydev_button(button)
-    return(
-        (has_gamepad && raylib.IsGamepadButtonPressed(gamepad, button)) ||
-        (linux_gamepad_available() && linux_gamepad_button_pressed(joy_btn)) ||
-        raylib.IsKeyPressed(key) \
-    )
+
+    // Raylib gamepads
+    for i := i32(0); i < MAX_RAYLIB_GAMEPADS; i += 1 {
+        if raylib.IsGamepadAvailable(i) && raylib.IsGamepadButtonPressed(i, button) {
+            return true
+        }
+    }
+
+    // Linux joydev gamepads
+    when ODIN_OS == .Linux {
+        for i := 0; i < MAX_LINUX_GAMEPADS; i += 1 {
+            if linux_gamepad_button_pressed(i, joy_btn) {
+                return true
+            }
+        }
+    }
+
+    // Keyboard
+    return raylib.IsKeyPressed(key)
 }

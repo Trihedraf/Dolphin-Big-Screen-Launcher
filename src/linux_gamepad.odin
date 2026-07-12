@@ -18,6 +18,8 @@ JS_AXIS_LEFT_Y :: 1
 JS_AXIS_DPAD_X :: 6
 JS_AXIS_DPAD_Y :: 7
 
+MAX_LINUX_GAMEPADS :: 4
+
 when ODIN_OS == .Linux {
 
     JS_EVENT_BUTTON :: u8(0x01)
@@ -32,10 +34,12 @@ when ODIN_OS == .Linux {
         axis_values:        [8]i16,
     }
 
-    linux_gp: LinuxGamepadState
+    linux_gamepads: [MAX_LINUX_GAMEPADS]LinuxGamepadState
+    num_linux_gamepads: int
 
     linux_gamepad_init :: proc() {
-        for i := 0; i < 4; i += 1 {
+        num_linux_gamepads = 0
+        for i := 0; i < MAX_LINUX_GAMEPADS; i += 1 {
             path := fmt.tprintf("/dev/input/js%d", i)
             f, err := os.open(path, os.File_Flags{.Read, .Non_Blocking})
             if err != os.ERROR_NONE || f == nil {
@@ -72,10 +76,10 @@ when ODIN_OS == .Linux {
                 }
             }
 
-            // Drain init events to count axes/buttons.
             buf: [512]u8
             num_axes := 0
             num_buttons := 0
+            gp := &linux_gamepads[num_linux_gamepads]
 
             for {
                 n, read_err := os.read(f, buf[:])
@@ -95,15 +99,15 @@ when ODIN_OS == .Linux {
                     if is_init {
                         idx := int(ev_number)
                         if raw_type == JS_EVENT_AXIS {
-                            if idx < len(linux_gp.axis_values) {
-                                linux_gp.axis_values[idx] = ev_value
+                            if idx < len(gp.axis_values) {
+                                gp.axis_values[idx] = ev_value
                             }
                             if idx + 1 > num_axes {
                                 num_axes = idx + 1
                             }
                         } else if raw_type == JS_EVENT_BUTTON {
-                            if idx < len(linux_gp.button_states) {
-                                linux_gp.button_states[idx] = ev_value != 0
+                            if idx < len(gp.button_states) {
+                                gp.button_states[idx] = ev_value != 0
                             }
                             if idx + 1 > num_buttons {
                                 num_buttons = idx + 1
@@ -119,8 +123,9 @@ when ODIN_OS == .Linux {
             }
 
             if num_axes >= 2 && num_buttons >= 4 {
-                linux_gp.file = f
-                linux_gp.available = true
+                gp.file = f
+                gp.available = true
+                num_linux_gamepads += 1
                 if verbose {
                     fmt.println(
                         "Linux gamepad opened:",
@@ -133,11 +138,10 @@ when ODIN_OS == .Linux {
                         num_buttons,
                         "buttons )",
                     )
-                    for a := 0; a < num_axes && a < len(linux_gp.axis_values); a += 1 {
-                        fmt.println("  axis", a, "=", linux_gp.axis_values[a])
+                    for a := 0; a < num_axes && a < len(gp.axis_values); a += 1 {
+                        fmt.println("  axis", a, "=", gp.axis_values[a])
                     }
                 }
-                return
             } else {
                 if verbose {
                     fmt.println("Skipping non-gamepad:", path, "name:", device_name)
@@ -148,77 +152,98 @@ when ODIN_OS == .Linux {
     }
 
     linux_gamepad_poll :: proc() {
-        if !linux_gp.available || linux_gp.file == nil {
-            return
-        }
-
-        // Copy current button states to previous for edge detection.
-        for i := 0; i < len(linux_gp.button_states); i += 1 {
-            linux_gp.prev_button_states[i] = linux_gp.button_states[i]
-        }
-
-        buf: [512]u8
-        for {
-            n, err := os.read(linux_gp.file, buf[:])
-            if err != os.ERROR_NONE || n < 8 {
-                break
+        for i := 0; i < num_linux_gamepads; i += 1 {
+            gp := &linux_gamepads[i]
+            if !gp.available || gp.file == nil {
+                continue
             }
 
-            offset := 0
-            for offset + 8 <= n {
-                ev_type := buf[offset + 6]
-                ev_number := buf[offset + 7]
-                ev_value := cast(i16)(cast(u16)(buf[offset + 4]) |
-                    (cast(u16)(buf[offset + 5]) << 8))
+            for j := 0; j < len(gp.button_states); j += 1 {
+                gp.prev_button_states[j] = gp.button_states[j]
+            }
 
-                raw_type := ev_type & ~JS_EVENT_INIT
-
-                if raw_type == JS_EVENT_BUTTON && ev_number < len(linux_gp.button_states) {
-                    linux_gp.button_states[ev_number] = ev_value != 0
-                } else if raw_type == JS_EVENT_AXIS && ev_number < len(linux_gp.axis_values) {
-                    linux_gp.axis_values[ev_number] = ev_value
+            buf: [512]u8
+            for {
+                n, err := os.read(gp.file, buf[:])
+                if err != os.ERROR_NONE || n < 8 {
+                    break
                 }
 
-                offset += 8
-            }
+                offset := 0
+                for offset + 8 <= n {
+                    ev_type := buf[offset + 6]
+                    ev_number := buf[offset + 7]
+                    ev_value := cast(i16)(cast(u16)(buf[offset + 4]) |
+                        (cast(u16)(buf[offset + 5]) << 8))
 
-            if n < len(buf) {
-                break
+                    raw_type := ev_type & ~JS_EVENT_INIT
+
+                    if raw_type == JS_EVENT_BUTTON && ev_number < len(gp.button_states) {
+                        gp.button_states[ev_number] = ev_value != 0
+                    } else if raw_type == JS_EVENT_AXIS && ev_number < len(gp.axis_values) {
+                        gp.axis_values[ev_number] = ev_value
+                    }
+
+                    offset += 8
+                }
+
+                if n < len(buf) {
+                    break
+                }
             }
         }
     }
 
     linux_gamepad_close :: proc() {
-        if linux_gp.file != nil {
-            os.close(linux_gp.file)
-            linux_gp.file = nil
+        for i := 0; i < num_linux_gamepads; i += 1 {
+            gp := &linux_gamepads[i]
+            if gp.file != nil {
+                os.close(gp.file)
+                gp.file = nil
+            }
+            gp.available = false
         }
-        linux_gp.available = false
+        num_linux_gamepads = 0
     }
 
-    linux_gamepad_available :: proc() -> bool {
-        return linux_gp.available
+    linux_gamepad_available :: proc(idx: int) -> bool {
+        if idx < 0 || idx >= num_linux_gamepads {
+            return false
+        }
+        return linux_gamepads[idx].available
     }
 
-    linux_gamepad_axis :: proc(axis: int) -> f32 {
-        if axis < 0 || axis >= len(linux_gp.axis_values) {
+    linux_gamepad_axis :: proc(idx: int, axis: int) -> f32 {
+        if idx < 0 || idx >= num_linux_gamepads {
             return 0
         }
-        return f32(linux_gp.axis_values[axis]) / 32767.0
+        gp := &linux_gamepads[idx]
+        if axis < 0 || axis >= len(gp.axis_values) {
+            return 0
+        }
+        return f32(gp.axis_values[axis]) / 32767.0
     }
 
-    linux_gamepad_button_down :: proc(btn: int) -> bool {
-        if btn < 0 || btn >= len(linux_gp.button_states) {
+    linux_gamepad_button_down :: proc(idx: int, btn: int) -> bool {
+        if idx < 0 || idx >= num_linux_gamepads {
             return false
         }
-        return linux_gp.button_states[btn]
+        gp := &linux_gamepads[idx]
+        if btn < 0 || btn >= len(gp.button_states) {
+            return false
+        }
+        return gp.button_states[btn]
     }
 
-    linux_gamepad_button_pressed :: proc(btn: int) -> bool {
-        if btn < 0 || btn >= len(linux_gp.button_states) {
+    linux_gamepad_button_pressed :: proc(idx: int, btn: int) -> bool {
+        if idx < 0 || idx >= num_linux_gamepads {
             return false
         }
-        return linux_gp.button_states[btn] && !linux_gp.prev_button_states[btn]
+        gp := &linux_gamepads[idx]
+        if btn < 0 || btn >= len(gp.button_states) {
+            return false
+        }
+        return gp.button_states[btn] && !gp.prev_button_states[btn]
     }
 
 } else {
@@ -226,9 +251,9 @@ when ODIN_OS == .Linux {
     linux_gamepad_init :: proc() {}
     linux_gamepad_poll :: proc() {}
     linux_gamepad_close :: proc() {}
-    linux_gamepad_available :: proc() -> bool {return false}
-    linux_gamepad_axis :: proc(axis: int) -> f32 {return 0}
-    linux_gamepad_button_down :: proc(btn: int) -> bool {return false}
-    linux_gamepad_button_pressed :: proc(btn: int) -> bool {return false}
+    linux_gamepad_available :: proc(idx: int) -> bool {return false}
+    linux_gamepad_axis :: proc(idx: int, axis: int) -> f32 {return 0}
+    linux_gamepad_button_down :: proc(idx: int, btn: int) -> bool {return false}
+    linux_gamepad_button_pressed :: proc(idx: int, btn: int) -> bool {return false}
 
 }

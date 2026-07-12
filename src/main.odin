@@ -102,8 +102,8 @@ main :: proc() {
 
     when ODIN_OS == .Linux {
         linux_gamepad_init()
-        if verbose && linux_gamepad_available() {
-            fmt.println("Joydev gamepad fallback active.")
+        if verbose && num_linux_gamepads > 0 {
+            fmt.println("Joydev gamepad fallback active:", num_linux_gamepads, "device(s)")
         }
     }
 
@@ -340,12 +340,19 @@ handle_library_input :: proc(app: ^App) {
         return
     }
 
-    launch :=
-        is_action_pressed(.RIGHT_FACE_DOWN, .ENTER) ||
-        raylib.IsKeyPressed(.SPACE) ||
-        (raylib.IsGamepadAvailable(0) && raylib.IsGamepadButtonPressed(0, .MIDDLE_RIGHT))
+    launch := is_action_pressed(.RIGHT_FACE_DOWN, .ENTER) || raylib.IsKeyPressed(.SPACE)
+
+    for i := i32(0); i < MAX_RAYLIB_GAMEPADS && !launch; i += 1 {
+        if raylib.IsGamepadAvailable(i) && raylib.IsGamepadButtonPressed(i, .MIDDLE_RIGHT) {
+            launch = true
+        }
+    }
     when ODIN_OS == .Linux {
-        launch = launch || linux_gamepad_button_pressed(JS_BTN_START)
+        for i := 0; i < MAX_LINUX_GAMEPADS && !launch; i += 1 {
+            if linux_gamepad_button_pressed(i, JS_BTN_START) {
+                launch = true
+            }
+        }
     }
     if launch {
         game := &app.games[app.ui_state.selected_index]
